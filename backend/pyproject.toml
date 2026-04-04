@@ -1,0 +1,38 @@
+[project]
+name = "lms-backend"
+version = "0.1.0"
+description = "LMS Backend API"
+requires-python = "==3.14.*"
+dependencies = [
+  "asyncpg>=0.30.0",
+  "opentelemetry-distro[otlp]>=0.61b0",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
+  "opentelemetry-instrumentation-fastapi>=0.61b0",
+  "opentelemetry-instrumentation-sqlalchemy>=0.61b0",
+  "opentelemetry-instrumentation-httpx>=0.61b0",
+  "opentelemetry-instrumentation-asyncpg>=0.61b0",
+  "opentelemetry-instrumentation-logging>=0.61b0",
+  "fastapi==0.128.7",
+  "httpx==0.28.1",
+  "pydantic==2.12.5",
+  "pydantic-settings==2.12.0",
+  "sqlmodel>=0.0.22",
+  "uvicorn[standard]==0.40.0",
+]
+
+[dependency-groups]
+dev = [
+  "aiosqlite>=0.21.0",
+  "greenlet>=3.2.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lms_backend*"]

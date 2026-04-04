@@ -1,0 +1,141 @@
+@startuml Sequence Diagram
+!theme plain
+autonumber
+
+title Yandex Go Ride Booking Flow - Ride Booking Flow
+
+' --- Participants Definition ---
+
+box "Client Side" #White
+  actor "User" as User
+  participant "Mobile App" as App
+end box
+
+box "Connection Layer" #WhiteSmoke
+  participant "API Gateway" as Gateway
+end box
+
+box "Core Services" #E6F3FF
+  participant "User Service" as UserSvc
+  participant "Maps & Pricing" as LogicSvc
+  participant "Dispatch Service" as DispatchSvc
+  participant "Payment Service" as PaySvc
+  participant "Push Service" as PushSvc
+end box
+
+box "Data & Middleware" #FFFFE0
+  queue "Kafka Event Bus" as Kafka
+  database "State Cache" as Cache
+  database "Operational DB" as DB
+end box
+
+box "External Ecosystem" #MistyRose
+  participant "Ext Maps API" as ExtMaps
+  participant "Ext Payment" as ExtPay
+end box
+
+' --- Flow 1: Initialization ---
+
+group #F9F9F9 1. App Initialization & Auth
+    note right of App: Session validation occurs\non app launch.
+
+    User -> App: Open App
+    App -> Gateway: RPC: validateSession(token)
+    activate Gateway
+    
+    Gateway -> UserSvc: Authenticate Token
+    activate UserSvc
+    
+    UserSvc -> Cache: Lookup Session/Profile
+    Cache -->> UserSvc: Session Valid
+    
+    UserSvc -->> Gateway: User Profile Data
+    deactivate UserSvc
+    
+    Gateway -->> App: Auth Success
+    deactivate Gateway
+end
+
+' --- Flow 2: Estimation ---
+
+group #F0FFF0 2. Price Estimation (Pre-Ride)
+    User -> App: Enter Destination
+    App -> Gateway: RPC: estimateRide(coords_A, coords_B)
+    activate Gateway
+
+    Gateway -> LogicSvc: Calculate Options
+    activate LogicSvc
+    
+    LogicSvc -> ExtMaps: Fetch Route & Traffic
+    ExtMaps -->> LogicSvc: Route Data
+    
+    LogicSvc -> DB: Fetch Tariff Rules
+    LogicSvc -> Cache: Check Demand Surge
+    
+    LogicSvc -->> Gateway: Options (Economy, Comfort)
+    deactivate LogicSvc
+    
+    Gateway -->> App: Show Route & Price
+    deactivate Gateway
+end
+
+' --- Flow 3: Booking & Dispatch ---
+
+group #FFF0F0 3. Booking & Async Dispatch
+    App -> Gateway: RPC: createOrder(class, payment_id)
+    activate Gateway
+    
+    Gateway -> DispatchSvc: Initialize Ride
+    activate DispatchSvc
+    
+    DispatchSvc -> UserSvc: Validate Payment Method
+    UserSvc -->> DispatchSvc: OK
+    
+    DispatchSvc -> DB: Persist Order (Status: SEARCHING)
+    DispatchSvc -> Cache: Geospatial Search (Drivers)
+    Cache -->> DispatchSvc: Candidate Drivers
+    
+    note left of DispatchSvc: Matching algorithm runs\ninternally.
+    
+    DispatchSvc -> DB: Update Order (Status: ASSIGNED)
+    DispatchSvc -> Kafka: Publish Event (RideAssigned)
+    
+    DispatchSvc -->> Gateway: Order Created
+    deactivate DispatchSvc
+    Gateway -->> App: ACK (Searching UI)
+    deactivate Gateway
+    
+    ' -- Async Notification --
+    Kafka -->> PushSvc: Consume Event (RideAssigned)
+    activate PushSvc
+    PushSvc -> App: Push Notification ("Driver Found")
+    deactivate PushSvc
+    App -->> User: Update Map (Show Driver)
+end
+
+' --- Flow 4: Completion & Payment ---
+
+group #FFFFE0 4. Ride Completion (Payment)
+    note right of DispatchSvc: Triggered by Driver App\n(physically completing ride).
+
+    DispatchSvc -> PaySvc: Initiate Transaction
+    activate PaySvc
+    
+    PaySvc -> DB: Fetch Order Details
+    PaySvc -> ExtPay: Charge Card
+    ExtPay -->> PaySvc: Transaction Success
+    
+    PaySvc -> DB: Update Status (PAID)
+    PaySvc -> Kafka: Publish Event (PaymentSuccess)
+    deactivate PaySvc
+    
+    Kafka -->> PushSvc: Consume Event (PaymentSuccess)
+    activate PushSvc
+    
+    PushSvc -> App: Push Notification ("Receipt Available")
+    deactivate PushSvc
+    
+    App -> User: Display Receipt & Rate
+end
+
+@enduml

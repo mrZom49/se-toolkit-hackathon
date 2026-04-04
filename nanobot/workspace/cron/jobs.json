@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "4818e617",
+      "name": "🐾 LMS Health Check: Check for ",
+      "enabled": true,
+      "schedule": {
+        "kind": "every",
+        "atMs": null,
+        "everyMs": 120000,
+        "expr": null,
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "🐾 LMS Health Check: Check for backend errors in the last 2 minutes using observability tools, inspect traces if errors found, and post a summary to webchat channel f6db0590-6016-4b8d-85b3-6e7bbf2efaec",
+        "deliver": true,
+        "channel": "webchat",
+        "to": "f6db0590-6016-4b8d-85b3-6e7bbf2efaec"
+      },
+      "state": {
+        "nextRunAtMs": 1775291859881,
+        "lastRunAtMs": 1775291723695,
+        "lastStatus": "ok",
+        "lastError": null,
+        "runHistory": [
+          {
+            "runAtMs": 1775289020867,
+            "status": "ok",
+            "durationMs": 43135,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289184004,
+            "status": "ok",
+            "durationMs": 66275,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289370282,
+            "status": "ok",
+            "durationMs": 34027,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289524311,
+            "status": "ok",
+            "durationMs": 23053,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289667386,
+            "status": "ok",
+            "durationMs": 9414,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289796823,
+            "status": "ok",
+            "durationMs": 9034,
+            "error": null
+          },
+          {
+            "runAtMs": 1775289925879,
+            "status": "ok",
+            "durationMs": 17086,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290062986,
+            "status": "ok",
+            "durationMs": 15549,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290198557,
+            "status": "ok",
+            "durationMs": 16874,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290335455,
+            "status": "ok",
+            "durationMs": 20805,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290476281,
+            "status": "ok",
+            "durationMs": 19195,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290615499,
+            "status": "ok",
+            "durationMs": 19800,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290755321,
+            "status": "ok",
+            "durationMs": 16173,
+            "error": null
+          },
+          {
+            "runAtMs": 1775290891517,
+            "status": "ok",
+            "durationMs": 30227,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291041768,
+            "status": "ok",
+            "durationMs": 21872,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291183661,
+            "status": "ok",
+            "durationMs": 13836,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291317531,
+            "status": "ok",
+            "durationMs": 19907,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291457461,
+            "status": "ok",
+            "durationMs": 12600,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291590087,
+            "status": "ok",
+            "durationMs": 13583,
+            "error": null
+          },
+          {
+            "runAtMs": 1775291723695,
+            "status": "ok",
+            "durationMs": 16186,
+            "error": null
+          }
+        ]
+      },
+      "createdAtMs": 1775147842964,
+      "updatedAtMs": 1775291739881,
+      "deleteAfterRun": false
+    }
+  ]
+}

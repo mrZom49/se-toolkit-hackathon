@@ -1,0 +1,154 @@
+@startuml Component Diagram
+!theme plain
+
+title Wildberries.ru Architecture Component Diagram
+
+package "Wildberries Platform" {
+  
+  package "Client Layer" {
+    [Customer Mobile App] as client_app
+    [Customer Website (SSR)] as client_web
+    [WB Partners App (Seller)] as seller_app
+    [PVZ Software (Pickup Point)] as pvz_app
+    [Warehouse Terminals] as wms_client
+  }
+  
+  package "API Gateway Layer" {
+    [Storefront Gateway] as api_gateway
+    [Partner/Seller Gateway] as seller_gateway
+    [Internal/Ops Gateway] as ops_gateway
+  }
+  
+  package "Core Domain Services" {
+    [Auth & ID Service] as auth_service
+    [Catalog & Search Service] as catalog_service
+    [Order Management (OMS)] as order_service
+    [Cart & Checkout Service] as cart_service
+    [Fintech & Payment Service] as pay_service
+    [User Profile & Loyalty] as user_service
+  }
+  
+  package "Logistics & Supply Chain" {
+    [Warehouse Management (WMS)] as wms_service
+    [Logistics & Routing] as logistics_service
+    [PVZ Management Service] as pvz_service
+  }
+  
+  package "Content & Engagement" {
+    [Review & Ratings Service] as review_service
+    [Media/CDN Service] as media_service
+    [Notification Service] as push_service
+  }
+
+  package "Data Layer" {
+    [Product/Order DB (Sharded)] as main_db
+    [Search Index (Elasticsearch)] as search_idx
+    [Object Storage (S3/Images)] as media_storage
+    [Session/Hot Cache (Redis)] as cache
+    [Analytics/Clickhouse] as analytics_db
+  }
+  
+  queue "Event Bus (Kafka)" as broker
+  
+  ' Interface Components
+  () "HTTPS / GraphQL / REST" as public_api
+  
+  () "gRPC / Internal API" as internal_rpc
+  
+  note right of internal_rpc
+    <b>Architectural Abstraction</b>
+    This node represents the <b>Service Mesh</b>.
+    
+    While services expose <i>distinct</i> contracts, they share:
+    1. <b>Protocol:</b> gRPC (Protobuf/HTTP2)
+    2. <b>Discovery:</b> Internal Registry (e.g., K8s DNS/Consul)
+    3. <b>Security:</b> mTLS / Private VPC
+  end note
+  
+  () "DB Read/Write" as db_api
+  () "Search Query" as search_api
+  () "File I/O" as storage_api
+  () "Cache Access" as cache_api
+  () "Pub/Sub" as broker_api
+
+  ' Wiring Clients to Gateways
+  client_app -down-( public_api
+  client_web -down-( public_api
+  
+  seller_app -down-( public_api
+  pvz_app -down-( public_api
+  wms_client -down-( public_api
+
+  public_api -down- api_gateway
+  public_api -down- seller_gateway
+  public_api -down- ops_gateway
+}
+
+package "External Ecosystem" {
+  [Payment Providers / Acquiring] as ext_banks
+  [3rd Party Logistics (3PL)] as ext_logistics
+  [SMS / Push Providers] as ext_push
+}
+
+' Gateways to Microservices
+api_gateway -down-( internal_rpc
+seller_gateway -down-( internal_rpc
+ops_gateway -down-( internal_rpc
+
+' Connecting Services to RPC
+internal_rpc -down- auth_service
+internal_rpc -down- catalog_service
+internal_rpc -down- order_service
+internal_rpc -down- cart_service
+internal_rpc -down- pay_service
+internal_rpc -down- user_service
+internal_rpc -down- wms_service
+internal_rpc -down- logistics_service
+internal_rpc -down- pvz_service
+internal_rpc -down- review_service
+internal_rpc -down- media_service
+
+' Services to Data Layer
+catalog_service -down-( db_api
+order_service -down-( db_api
+user_service -down-( db_api
+pay_service -down-( db_api
+wms_service -down-( db_api
+
+main_db -up- db_api
+
+catalog_service -down-( search_api
+search_idx -up- search_api
+
+media_service -down-( storage_api
+media_storage -up- storage_api
+
+catalog_service -down-( cache_api
+cart_service -down-( cache_api
+auth_service -down-( cache_api
+cache -up- cache_api
+
+' Asynchronous Event Logic (Ordering Flow)
+order_service -down-( broker_api
+wms_service -up-( broker_api
+logistics_service -up-( broker_api
+push_service -up-( broker_api
+analytics_db -up-( broker_api
+broker -down- broker_api
+
+' External Integrations
+
+() "3PL / Shipping API" as logistics_api
+() "Payment Gateway API" as bank_api
+() "Push/SMS API" as notify_api
+
+pay_service -down-( bank_api
+bank_api -down- ext_banks
+
+logistics_service -down-( logistics_api 
+logistics_api -down- ext_logistics
+
+push_service -down-( notify_api
+notify_api -down- ext_push
+
+@enduml

@@ -1,0 +1,154 @@
+@startuml Deployment Diagram
+!theme plain
+
+skinparam node {
+  BackgroundColor WhiteSmoke
+  BorderColor DarkBlue
+  ArrowColor #444444
+}
+
+skinparam component {
+  BackgroundColor White
+  BorderColor Black
+}
+
+skinparam cloud {
+  BackgroundColor LightCyan
+  BorderColor DarkCyan
+}
+
+skinparam database {
+  BackgroundColor White
+  BorderColor Black
+}
+
+title Wildberries.ru Deployment Diagram (Physical View)
+
+' --- Client Tier ---
+node "Customer Smartphone" <<device>> as CustPhone {
+  component [Customer Mobile App\n(iOS/Android)] as client_app
+}
+
+node "Partner Smartphone" <<device>> as SellerPhone {
+  component [WB Partners App\n(Seller App)] as seller_app
+}
+
+node "User Computer" <<device>> as Computer {
+  node "Web Browser" <<execution environment>> {
+    component [Customer Website\n(SSR)] as client_web
+  }
+}
+
+node "WB Enterprise Hardware" <<device>> as Hardware {
+  component [PVZ Software\n(Pickup Point PC)] as pvz_app
+  component [Warehouse Terminal\n(Barcode Scanner/PC)] as wms_client
+}
+
+' --- External / Third Party ---
+cloud "Financial & Logistics Ecosystem" {
+  component [Payment Providers\n(Acquiring/SBP)] as ext_banks
+  component [3rd Party Logistics\n(3PL)] as ext_logistics
+}
+
+cloud "External Notifications" {
+  component [SMS / Push Providers\n(APNs)] as ext_push
+}
+
+' --- Cloud Infrastructure ---
+cloud "Wildberries Global Infrastructure (Primary DC / K8s)" {
+
+  node "Edge / Ingress Layer" as Edge {
+    component [Storefront Gateway\n(Public API)] as api_gateway
+    component [Partner Gateway\n(B2B API)] as seller_gateway
+    component [Internal/Ops Gateway\n(Staff API)] as ops_gateway
+  }
+
+  ' --- Compute Cluster ---
+  node "Compute Cluster (Microservices)" as Compute {
+    node "E-Commerce Pods" {
+      component [Auth & ID Service] as auth_service
+      component [Catalog & Search] as catalog_service
+      component [Cart & Checkout] as cart_service
+      component [Fintech & Payment] as pay_service
+    }
+    
+    node "Logistics & Ops Pods" {
+      component [Order Mgmt (OMS)] as order_service
+      component [Warehouse Mgmt (WMS)] as wms_service
+      component [Logistics & Routing] as logistics_service
+      component [PVZ Management] as pvz_service
+    }
+
+    node "Support Pods" {
+      component [Notification Service] as push_service
+      component [Media/CDN Service] as media_service
+    }
+  }
+
+  ' --- Middleware & Data ---
+  node "Event Bus Cluster" as BrokerNode {
+    queue [Kafka Event Bus\n(Distributed Log)] as broker
+  }
+
+  node "In-Memory Cluster" as CacheNode {
+    component [Session/Hot Cache\n(Redis Cluster)] as cache
+  }
+
+  node "Search Cluster" as SearchNode {
+    database [Search Index\n(Elasticsearch)] as search_idx
+  }
+
+  node "Storage & Database Cluster" as DBServer {
+    database [Main RDBMS\n(Sharded PostgreSQL)] as main_db
+    database [Analytics Engine\n(Clickhouse)] as analytics_db
+    database [Object Storage\n(S3)] as media_storage
+  }
+}
+
+' --- Relationships ---
+
+' Client to Infrastructure (HTTPS)
+client_app --> api_gateway : HTTPS / GraphQL
+client_web --> api_gateway : HTTPS / SSR
+seller_app --> seller_gateway : HTTPS
+pvz_app --> ops_gateway : HTTPS
+wms_client --> ops_gateway : HTTPS
+
+' Gateways to Internal RPC (Service Mesh)
+api_gateway --> auth_service : gRPC (mTLS)
+api_gateway --> catalog_service : gRPC
+api_gateway --> cart_service : gRPC
+seller_gateway --> pay_service : gRPC
+ops_gateway --> wms_service : gRPC
+ops_gateway --> pvz_service : gRPC
+
+' Compute to Storage (Data)
+catalog_service --> main_db : TCP (JDBC)
+order_service --> main_db : TCP (JDBC)
+wms_service --> main_db : TCP (JDBC)
+
+' Compute to Cache & Search
+catalog_service ..> search_idx : HTTP (REST)
+catalog_service ..> cache : TCP (RESP)
+cart_service ..> cache : TCP (RESP)
+auth_service ..> cache : TCP (RESP)
+
+' Media Storage
+media_service --> media_storage : S3 API / HTTPS
+
+' Compute to Messaging (Async)
+order_service --> broker : Publish Orders
+wms_service --> broker : Publish State
+logistics_service --> broker : Publish Routes
+pay_service --> broker : Publish Payment State
+
+' Analytics & Notifications consuming events
+broker ..> push_service : Consume
+broker ..> analytics_db : Sink (Kafka Engine)
+
+' External Integrations
+pay_service --> ext_banks : HTTPS (TLS 1.3)
+logistics_service --> ext_logistics : API (HTTPS)
+push_service --> ext_push : HTTP/2 (APNs/FCM)
+
+@enduml

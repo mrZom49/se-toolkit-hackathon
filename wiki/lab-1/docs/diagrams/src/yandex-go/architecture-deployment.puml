@@ -1,0 +1,120 @@
+@startuml Deployment Diagram
+!theme plain
+
+skinparam node {
+  BackgroundColor WhiteSmoke
+  BorderColor DarkBlue
+  ArrowColor #444444
+}
+
+skinparam component {
+  BackgroundColor White
+  BorderColor Black
+}
+
+skinparam cloud {
+  BackgroundColor LightCyan
+  BorderColor DarkCyan
+}
+
+skinparam database {
+  BackgroundColor White
+  BorderColor Black
+}
+
+title Yandex Go Deployment Diagram (Physical View)
+
+' --- Client Tier ---
+node "User Smartphone" <<device>> as SmartPhone {
+  component [Yandex Go Mobile App\n(iOS/Android)] as mobile_app
+}
+
+node "User Computer" <<device>> as Computer {
+  node "Web Browser" <<execution environment>> {
+    component [Yandex Go Web App] as web_app
+  }
+}
+
+' --- Cloud Infrastructure ---
+cloud "Yandex Cloud Infrastructure" {
+
+  node "Load Balancer" as LB {
+    component [API Gateway] as api_gateway
+  }
+
+  ' --- Compute Cluster ---
+  node "Kubernetes Cluster (Application Tier)" as K8s {
+    node "Pod" {
+      component [User Service] as user_service
+      component [Payment Service] as payment_service
+      component [Dispatch Service] as dispatch_service
+      component [Pricing Service] as pricing_service
+      component [Maps & Routing Service] as maps_service
+      component [Notification Service] as notification_service
+    }
+  }
+
+  ' --- Middleware & Data ---
+  node "Message Broker Cluster" as BrokerNode {
+    queue [Kafka] as kafka
+  }
+
+  node "Redis Cluster" as RedisNode {
+    component [Redis Cache] as redis
+  }
+
+  node "Data Storage Cluster" as DBServer {
+    database [YDB (Operational)] as ydb
+    database [ClickHouse (Analytics)] as clickhouse
+  }
+  
+  node "Kubernetes Cluster (External Services)" <<external>> {
+    component [Yandex Pay API] as yandex_pay
+    component [Yandex Maps API] as global_maps
+  }
+}
+
+' --- Relationships ---
+
+' Client to Infrastructure
+mobile_app --> api_gateway : HTTPS (REST API calls)
+web_app --> api_gateway : HTTPS (REST API calls)
+
+' Gateway to Services
+api_gateway --> user_service : gRPC
+api_gateway --> payment_service : gRPC
+api_gateway --> dispatch_service : gRPC
+api_gateway --> pricing_service : gRPC
+api_gateway --> maps_service : gRPC
+notification_service --> api_gateway : gRPC
+
+' Service to Database (YDB)
+user_service --> ydb : YQL (gRPC)
+payment_service --> ydb : YQL (gRPC)
+dispatch_service --> ydb : YQL (gRPC)
+pricing_service --> ydb : YQL (gRPC)
+maps_service --> ydb : YQL (gRPC)
+
+' Service to Analytics (ClickHouse) - Async/Batch usually, but direct for simplicity here
+pricing_service ..> clickhouse : TCP
+dispatch_service ..> clickhouse : TCP
+
+' Service to Cache
+user_service ..> redis : TCP
+dispatch_service ..> redis : TCP
+pricing_service ..> redis : TCP
+
+' Service to Messaging
+user_service --> kafka : Publish
+payment_service --> kafka : Publish
+dispatch_service --> kafka : Publish
+notification_service --> kafka : Subscribe
+
+' Inter-service via Queue
+kafka ..> notification_service : Consume Events
+
+' Service to External
+payment_service --> yandex_pay : HTTPS
+maps_service --> global_maps : HTTPS
+
+@enduml

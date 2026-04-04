@@ -1,0 +1,142 @@
+@startuml Sequence Diagram
+!theme plain
+autonumber
+
+title Wildberries Order Flow (Checkout to Fulfillment)
+
+' --- Participants Definition ---
+
+box "Client Side" #White
+  actor "User Alice" as Alice
+  participant "WB Mobile App" as App
+end box
+
+box "Gateway Layer" #WhiteSmoke
+  participant "Storefront Gateway" as Gateway
+end box
+
+box "Core Business Services" #E6F3FF
+  participant "Cart Service" as CartSvc
+  participant "Order (OMS)" as OMS
+  participant "Payment Service" as PaySvc
+  participant "Inventory Service" as InvSvc
+end box
+
+box "Data & Middleware" #FFFFE0
+  queue "Kafka Event Bus" as Kafka
+  database "Redis (Hot Data)" as Cache
+  database "Sharded DB" as DB
+end box
+
+box "Logistics & External" #MistyRose
+  participant "WMS (Warehouse)" as WMS
+  participant "Bank / Acquirer" as Bank
+end box
+
+' --- Flow 1: Search & Add to Cart ---
+
+group #F9F9F9 1. Preparation (Search & Cart)
+    note right of App: User browses catalog and\nselects items.
+
+    Alice -> App: Click "Add to Cart"
+    App -> Gateway: RPC: addToCart(sku_id, qty)
+    activate Gateway
+    
+    Gateway -> CartSvc: Update Session Cart
+    activate CartSvc
+    
+    CartSvc -> Cache: HSET cart:{user_id} (TTL 7 days)
+    Cache -->> CartSvc: OK
+    
+    CartSvc -->> Gateway: Cart Updated (Total Price)
+    deactivate CartSvc
+    
+    Gateway -->> App: UI Update (Badge Counter)
+    deactivate Gateway
+end
+
+' --- Flow 2: Checkout & Reservation ---
+
+group #F0FFF0 2. Checkout (Reservation & Payment)
+    Alice -> App: Click "Pay Now"
+    App -> Gateway: RPC: createOrder(cart_id, payment_method)
+    activate Gateway
+
+    Gateway -> OMS: Initialize Order
+    activate OMS
+    
+    ' -- Hard Reservation --
+    OMS -> InvSvc: Reserve Stock(sku_ids)
+    activate InvSvc
+    InvSvc -> DB: Transaction: Decrement Available Stock
+    DB -->> InvSvc: Reservation ID / OK
+    InvSvc -->> OMS: Stock Reserved (Hold 15m)
+    deactivate InvSvc
+    
+    OMS -> DB: Save Order (Status: PENDING_PAYMENT)
+    
+    ' -- Payment Initiation --
+    OMS -> PaySvc: Initiate Transaction
+    activate PaySvc
+    PaySvc -> Bank: API: Charge Token / Get 3DS URL
+    Bank -->> PaySvc: 3DS Redirect Needed
+    PaySvc -->> OMS: Payment URL
+    deactivate PaySvc
+    
+    OMS -->> Gateway: Order Created (Payment Required)
+    deactivate OMS
+    Gateway -->> App: Open WebView (Bank 3DS)
+    deactivate Gateway
+    
+    note right of App: User confirms transaction\nin banking interface.
+end
+
+' --- Flow 3: Async Payment Confirmation ---
+
+group #FFF0F0 3. Payment Callback & Finalization
+    Bank -> Gateway: Webhook: Payment Success (TxID)
+    activate Gateway
+    
+    Gateway -> PaySvc: Process Callback
+    activate PaySvc
+    
+    PaySvc -> OMS: Update Order Status (PAID)
+    activate OMS
+    
+    OMS -> DB: UPDATE Orders SET Status='PAID'
+    
+    ' -- Fan Out --
+    note left of OMS: Critical: Decouple User/Bank latency\nfrom Warehouse logic.
+    OMS -> Kafka: Publish Event (OrderPaid)
+    
+    OMS -->> PaySvc: ACK
+    deactivate OMS
+    
+    PaySvc -->> Gateway: HTTP 200 OK
+    deactivate PaySvc
+    deactivate Gateway
+end
+
+' --- Flow 4: Logistics Fulfillment ---
+
+group #FFFFE0 4. Warehouse Fulfillment (Async)
+    Kafka -->> InvSvc: Consume (Commit Reservation)
+    
+    Kafka -->> WMS: Consume (OrderPaid)
+    activate WMS
+    
+    WMS -> DB: Look up Warehouse Location (Route logic)
+    WMS -> WMS: Generate Pick List (Closest Warehouse)
+    
+    note right of WMS: Physical Process:\nRobot/Human picks item.
+    
+    WMS -> Kafka: Publish Event (Status: ASSEMBLY_COMPLETE)
+    deactivate WMS
+    
+    Kafka -->> OMS: Update Status (READY_TO_SHIP)
+    
+    OMS -> Gateway: Push Notification (SSE)
+    Gateway -->> App: Notification ("Goods on the way")
+end
+
+@enduml

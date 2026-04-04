@@ -1,0 +1,43 @@
+name: Bug Report
+description: Create a report to help us improve
+title: "[Bug]: <short title>"
+labels: bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Brief problem description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the issue you encountered...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the steps that led to the bug
+      placeholder: |
+        1. Go to '...'
+        2. Click '...'
+        3. Scroll down to '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+      description: What you expected to happen
+      placeholder: The menu opens.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Result
+      description: What actually happened
+      placeholder: I see an error.
+    validations:
+      required: true

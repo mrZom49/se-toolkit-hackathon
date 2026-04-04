@@ -1,0 +1,61 @@
+name: Close student task issues
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+
+
+jobs:
+  close-task-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Close with redirect message
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const contributorRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+
+            async function closeTaskIssue(issueNumber) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: "This looks like a task issue for your own project — please create it in your fork, not the upstream repo. Issues here are for reporting problems with the lab itself."
+              });
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                state: 'closed'
+              });
+            }
+
+            function isBugReport(issue) {
+              return issue.labels.some(l => l.name === 'bug');
+            }
+
+            if (context.eventName === 'workflow_dispatch') {
+              const issues = await github.paginate(github.rest.issues.list, {
+                owner,
+                repo,
+                state: 'open',
+              });
+
+              for (const issue of issues) {
+                if (issue.pull_request) continue;
+                if (contributorRoles.includes(issue.author_association)) continue;
+                if (isBugReport(issue)) continue;
+                await closeTaskIssue(issue.number);
+              }
+            } else {
+              const issue = context.payload.issue;
+              if (!contributorRoles.includes(issue.author_association) && !isBugReport(issue)) {
+                await closeTaskIssue(issue.number);
+              }
+            }

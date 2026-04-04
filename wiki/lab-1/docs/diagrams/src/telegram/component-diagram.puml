@@ -1,0 +1,103 @@
+@startuml Component Diagram
+!theme plain
+
+title Telegram Architecture Component Diagram
+
+package "Telegram Ecosystem" {
+  [Mobile App (iOS/Android)] as mobile_app
+  [Desktop App] as desktop_app
+  [Web Client (K/Z)] as web_app
+  
+  package "Connection Layer" {
+    [MTProto Gateway (DC Entry)] as connection_manager
+    [Bot API Server] as bot_api_server
+  }
+  
+  package "Core Services" {
+    [Auth & Session Service] as auth_service
+    [Message Handling Service] as msg_service
+    [Channel/Broadcast Service] as channel_service
+    [Media & File Service] as media_service
+    [Notification/Updates Service] as push_service
+    [Secret Chat Relay] as e2e_service
+  }
+  
+  package "Data Layer" {
+    [Sharded Chat DB] as sharded_db
+    [Distributed File System (DFS)] as media_storage
+    [State Cache (Redis)] as cache
+  }
+  
+  queue "Event Bus (Kafka/Internal)" as broker
+  
+  ' Interface Components
+  () "MTProto Protocol" as mtproto_api
+  () "HTTPS / Webhooks" as bot_https_api
+  
+  () "Internal RPC (TL-Schema)" as internal_rpc
+  () "File I/O" as dfs_api
+  () "DB Read/Write" as db_api
+  () "Cache Access" as cache_api
+  () "Pub/Sub" as broker_api
+
+  () "SMS Gateways" as sms_api
+  () "Push Notification API" as push_api
+  
+  ' Client to Connection Layer
+  mobile_app -down-( mtproto_api
+  desktop_app -down-( mtproto_api
+  web_app -down-( mtproto_api
+  
+  mtproto_api -down- connection_manager
+}
+
+package "External Ecosystem" {
+  [SMS Providers (Twilio/Others)] as sms_provider
+  [Push Services (FCM/APNs)] as push_provider
+  [3rd Party Bot Servers] as external_bots
+}
+
+' Connection Layer to Business Services
+connection_manager -down-( internal_rpc
+bot_api_server -down-( internal_rpc
+
+internal_rpc -down- auth_service
+internal_rpc -down- msg_service
+internal_rpc -down- channel_service
+internal_rpc -down- media_service
+internal_rpc -down- push_service
+internal_rpc -down- e2e_service
+
+' Bot API specific wiring
+external_bots -up-( bot_https_api
+bot_https_api -up- bot_api_server
+
+' Services to Data Layer
+msg_service -down-( db_api
+channel_service -down-( db_api
+auth_service -down-( db_api
+
+sharded_db -up- db_api
+
+media_service -down-( dfs_api
+media_storage -up- dfs_api
+
+msg_service -down-( cache_api
+channel_service -down-( cache_api
+auth_service -down-( cache_api
+cache -up- cache_api
+
+' Asynchronous Updates
+msg_service -down-( broker_api
+channel_service -down-( broker_api
+push_service -up-( broker_api
+broker -up- broker_api
+
+' External Integrations
+auth_service -down-( sms_api
+sms_api -down- sms_provider
+
+push_service -down-( push_api
+push_api -down- push_provider
+
+@enduml

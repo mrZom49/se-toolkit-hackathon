@@ -1,0 +1,122 @@
+@startuml Sequence Diagram
+!theme plain
+autonumber
+
+title Telegram Media Message Flow (Upload & Propagate)
+
+' --- Participants Definition ---
+
+box "Client Side" #White
+  actor "User Alice" as Alice
+  participant "Mobile App" as App
+end box
+
+box "Connection Layer" #WhiteSmoke
+  participant "MTProto Gateway" as Gateway
+end box
+
+box "Core Services" #E6F3FF
+  participant "Auth Service" as AuthSvc
+  participant "Media Service" as MediaSvc
+  participant "Message Service" as MsgSvc
+  participant "Push Service" as PushSvc
+end box
+
+box "Data & Middleware" #FFFFE0
+  queue "Kafka Event Bus" as Kafka
+  database "State Cache" as Cache
+  database "Sharded DB" as DB
+  database "Distributed DFS" as DFS
+end box
+
+box "External Ecosystem" #MistyRose
+  participant "Push Provider" as APNS
+  actor "User Bob" as Bob
+end box
+
+' --- Flow 1: Media Upload (Pre-flight) ---
+
+group #F9F9F9 1. Media Upload (Encrypted Parts)
+    note right of App: Media is uploaded via 'saveFilePart'\nbefore the message is sent.
+
+    Alice -> App: Select Photo & Send
+    App -> Gateway: RPC: saveFilePart (bytes, file_id_A)
+    activate Gateway
+    
+    Gateway -> MediaSvc: Stream File Data
+    activate MediaSvc
+    
+    MediaSvc -> DFS: Write File Chunk
+    DFS -->> MediaSvc: Checksum OK
+    
+    MediaSvc -> DB: Save File Metadata (Owner: Alice)
+    MediaSvc -->> Gateway: Part Saved
+    deactivate MediaSvc
+    
+    Gateway -->> App: ACK (Part Saved)
+    deactivate Gateway
+    
+    note right of App: App repeats until file is fully uploaded.
+end
+
+' --- Flow 2: Send Message Request ---
+
+group #F0FFF0 2. Send Message (with File Ref)
+    App -> Gateway: RPC: sendMessage(peer=Bob, input_file=file_id_A)
+    activate Gateway
+
+    Gateway -> AuthSvc: Validate Session
+    AuthSvc -->> Gateway: OK
+
+    Gateway -> MsgSvc: Process Message Request
+    activate MsgSvc
+    
+    MsgSvc -> DB: Persist Message (Inbox/Outbox)
+    MsgSvc -> Cache: Increment Sequence (pts)
+    
+    MsgSvc -->> Gateway: Message Accepted (ID assigned)
+    deactivate MsgSvc
+    
+    Gateway -->> App: RPC Response (Sent)
+    deactivate Gateway
+    
+    App -->> Alice: UI Update (Single Tick)
+end
+
+' --- Flow 3: Async Propagation ---
+
+group #FFF0F0 3. Event Propagation (Fan-out)
+    activate MsgSvc
+    note left of MsgSvc: Asynchronous processing after\npersistence.
+    
+    MsgSvc -> Kafka: Publish Event (NewMessageUpdate)
+    deactivate MsgSvc
+    
+    Kafka -->> Gateway: Consume (Sync to Online Devices)
+    Gateway -->> App: Update UI (Double Tick if read)
+end
+
+' --- Flow 4: Delivery to Recipient ---
+
+group #FFFFE0 4. Delivery to Bob (Push)
+    Kafka -->> PushSvc: Consume Event (NewMessageUpdate)
+    activate PushSvc
+    
+    PushSvc -> Cache: Lookup Bob's Session/Token
+    PushSvc -> DB: Check Notification Settings (Muted?)
+    DB -->> PushSvc: Not Muted
+    
+    PushSvc -> APNS: Send Notification ("Alice sent a photo")
+    deactivate PushSvc
+    
+    APNS -->> Bob: System Notification
+    
+    Bob -> Gateway: Open App / updates.getState
+    Gateway -> MsgSvc: Fetch Diff
+    MsgSvc -> DFS: Retrieve Photo Thumbnail
+    DFS -->> MsgSvc: Bytes
+    MsgSvc -->> Gateway: Update Object
+    Gateway -->> Bob: Display Photo
+end
+
+@enduml

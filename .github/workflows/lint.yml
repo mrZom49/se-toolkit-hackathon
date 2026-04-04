@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: cachix/install-nix-action@v31.9.1
+
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: lint-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          # do purge caches
+          purge: true
+          # purge all versions of the cache
+          purge-prefixes: lint-${{ runner.os }}-
+          # created more than 10 seconds ago relative to the start of the `Post Restore` phase
+          purge-created: 0
+          # except the version with the `primary-key`, if it exists
+          purge-primary-key: never
+          # and collect garbage in the Nix store until it reaches this size in bytes
+          gc-max-store-size: 2GB
+
+      - name: Lint docs
+        run: nix develop --command lint-docs
+
+      - name: Find broken links
+        run: nix develop --command find-broken-links

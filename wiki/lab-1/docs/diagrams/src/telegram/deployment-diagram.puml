@@ -1,0 +1,124 @@
+@startuml Deployment Diagram
+!theme plain
+
+skinparam node {
+  BackgroundColor WhiteSmoke
+  BorderColor DarkBlue
+  ArrowColor #444444
+}
+
+skinparam component {
+  BackgroundColor White
+  BorderColor Black
+}
+
+skinparam cloud {
+  BackgroundColor LightCyan
+  BorderColor DarkCyan
+}
+
+skinparam database {
+  BackgroundColor White
+  BorderColor Black
+}
+
+title Telegram Deployment Diagram (Physical View)
+
+' --- Client Tier ---
+node "User Smartphone" <<device>> as SmartPhone {
+  component [Telegram Mobile App\n(iOS/Android)] as mobile_app
+}
+
+node "User Computer" <<device>> as Computer {
+  component [Telegram Desktop App] as desktop_app
+  node "Web Browser" <<execution environment>> {
+    component [Telegram Web Client\n(WebA/WebK)] as web_app
+  }
+}
+
+' --- External / Third Party ---
+node "Third-Party Server" <<server>> as BotServer {
+  component [External Bot Logic] as ext_bot_logic
+}
+
+cloud "External Ecosystem" {
+  component [SMS Providers\n(Twilio/Others)] as sms_prov
+  component [Push Services\n(FCM/APNs)] as push_prov
+}
+
+' --- Cloud Infrastructure ---
+cloud "Telegram Global Infrastructure (Primary DC)" {
+
+  node "Edge / Connection Layer" as Edge {
+    component [MTProto Gateway\n(Connection Manager)] as mtproto_gw
+    component [Bot API Frontend\n(Custom)] as bot_gw
+  }
+
+  ' --- Compute Cluster ---
+  node "Compute Cluster (App Engine)" as Compute {
+    node "Pod / Container" {
+      component [Auth Service] as auth_svc
+      component [Message Service] as msg_svc
+      component [Channel Service] as chan_svc
+      component [Media Service] as media_svc
+      component [Push Notification Service] as push_svc
+    }
+  }
+
+  ' --- Middleware & Data ---
+  node "Event Bus Cluster" as BrokerNode {
+    queue [Kafka / Internal Bus] as kafka
+  }
+
+  node "In-Memory Cluster" as CacheNode {
+    component [State Cache\n(Redis)] as cache
+  }
+
+  node "Storage Cluster" as DBServer {
+    database [Sharded Chat DB\n(Custom Engine)] as sharded_db
+    database [Distributed File System\n(Local/Remote)] as dfs
+  }
+}
+
+' --- Relationships ---
+
+' Client to Infrastructure (MTProto)
+mobile_app --> mtproto_gw : MTProto (TCP/Obfuscated)
+desktop_app --> mtproto_gw : MTProto (TCP)
+web_app --> mtproto_gw : MTProto (WebSocket/HTTPS)
+
+' External Bots to Infrastructure (HTTPS)
+ext_bot_logic --> bot_gw : HTTPS (Webhooks/Long Poll)
+
+' Gateways to Internal RPC
+mtproto_gw --> auth_svc : RPC (TL-Schema)
+mtproto_gw --> msg_svc : RPC (TL-Schema)
+mtproto_gw --> media_svc : RPC (TL-Schema)
+bot_gw --> msg_svc : RPC (TL-Schema)
+
+' Service to Persistence (Data)
+auth_svc --> sharded_db : Native DB Proto
+msg_svc --> sharded_db : Native DB Proto
+chan_svc --> sharded_db : Native DB Proto
+
+' Service to Media Storage
+media_svc --> dfs : File I/O (TCP)
+
+' Service to Cache (High speed access)
+msg_svc ..> cache : TCP
+chan_svc ..> cache : TCP
+auth_svc ..> cache : TCP
+
+' Service to Messaging (Async)
+msg_svc --> kafka : Publish Updates
+chan_svc --> kafka : Publish Updates
+push_svc --> kafka : Subscribe
+
+' Notification Flow
+kafka ..> push_svc : Consume Events
+
+' Service to External Providers
+auth_svc --> sms_prov : SMPP / HTTP
+push_svc --> push_prov : HTTP/2 (APNs/FCM)
+
+@enduml

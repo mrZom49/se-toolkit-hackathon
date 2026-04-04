@@ -1,0 +1,114 @@
+@startuml Component Diagram
+!theme plain
+
+title Yandex Go Component Diagram
+
+package "Yandex Go Ecosystem" {
+  [Mobile App] as mobile_app
+  [Web App] as web_app
+  
+  package "API Layer" {
+    [API Gateway] as api_gateway
+  }
+  
+  package "Core Services" {
+    [User Service] as user_service
+    [Payment Service] as payment_service
+    [Dispatch Service] as dispatch_service
+    [Pricing Service] as pricing_service
+    [Maps & Routing Service] as maps_service
+    [Notification Service] as notification_service
+  }
+  
+  package "Data Layer" {
+    [Operational DB (YDB)] as db
+    [Analytics DB (ClickHouse)] as analytics
+    [Cache (Redis)] as cache
+  }
+  
+  queue "Message Broker (Kafka/Logbroker)" as queue
+  
+  ' Interface Components
+  () "REST API" as main_api
+  () "YQL" as db_crud_api
+  () "Read/Write" as cache_api
+  () "Events" as queue_api
+
+  () "gRPC" as user_service_api
+  () "gRPC" as payment_service_api
+  () "gRPC" as dispatch_service_api
+  () "gRPC" as notification_service_api
+  () "gRPC" as pricing_service_api
+  () "gRPC" as maps_service_api
+  
+  
+  () "Payment Processing" as payment_api
+  
+  () "Analytics API" as db_analytics_api
+  
+  () "Maps API" as maps_api
+  
+  
+  ' Client to API Gateway
+  mobile_app -down-( main_api
+  web_app -down-( main_api
+  main_api -down- api_gateway
+}
+
+package "External Services" {
+  [Yandex Pay] as external_payment_gateway
+  [Yandex Maps] as global_maps
+}
+
+
+' API Gateway to Business Services
+api_gateway -down-( user_service_api
+api_gateway -down-( payment_service_api
+api_gateway -down-( dispatch_service_api
+api_gateway -down-( notification_service_api
+api_gateway -down-( pricing_service_api
+api_gateway -down-( maps_service_api
+
+user_service_api -down- user_service
+payment_service_api -down- payment_service
+dispatch_service_api -down- dispatch_service
+notification_service_api -down- notification_service
+
+' Relationships for Pricing and Maps
+pricing_service -up- pricing_service_api
+maps_service -up- maps_service_api
+
+db -up- db_crud_api
+analytics -up- db_analytics_api
+cache -up- cache_api
+queue -up- queue_api
+
+' Business Services to Data Layer
+user_service -down-( db_crud_api
+payment_service -down-( db_crud_api
+dispatch_service -down-( db_crud_api
+pricing_service -down-( db_crud_api
+maps_service -down-( db_crud_api
+
+pricing_service -down-( db_analytics_api
+
+user_service -down-( cache_api
+dispatch_service -down-( cache_api
+pricing_service -down-( cache_api
+
+' Services to Message Queue (Kafka)
+user_service -down-( queue_api
+analytics -up-( queue_api
+payment_service -down-( queue_api
+dispatch_service -down-( queue_api
+notification_service -down-( queue_api
+
+' Payment Service to External Payment Gateway
+payment_service -down-( payment_api
+payment_api -down- external_payment_gateway
+
+' Maps Service to Global Data
+maps_service -down-( maps_api
+global_maps -up- maps_api
+
+@enduml

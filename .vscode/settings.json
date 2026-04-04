@@ -1,0 +1,42 @@
+{
+  // Git settings
+  "git.autofetch": true,
+
+  // Editor settings
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 500,
+  "editor.formatOnSave": true,
+
+  // Markdown settings
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
+  "markdown.extension.toc.levels": "2..6",
+
+  // Python settings
+  "python.languageServer": "Pylance",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+
+  // Change the Primary Sidebar location
+
+  "workbench.sideBar.location": "right",
+
+  // Markdown settings
+
+  // Set these settings to false if you don't want
+  // Markdown doc in the editor and preview to scroll synchronously.
+
+  "markdown.preview.scrollEditorWithPreview": true,
+  "markdown.preview.scrollPreviewWithEditor": true,
+
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nil",
+  "nix.formatterPath": "nixfmt",
+
+  // Necessary for now.
+  // See note here:
+  // https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs
+  "python.useEnvironmentsExtension": true
+}

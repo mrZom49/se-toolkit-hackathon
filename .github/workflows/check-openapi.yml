@@ -1,0 +1,38 @@
+name: Check OpenAPI schema
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-openapi:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Check openapi.json is up to date
+        id: check
+        run: uv run poe check-openapi
+        continue-on-error: true
+
+      # openapi.json describes the backend API. Other services rely
+      # on it to know which endpoints exist and what data they accept.
+      # If it falls out of sync, those services may send wrong
+      # requests or miss new endpoints.
+      - name: Warn if out of date
+        if: steps.check.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            core.warning(
+              'backend/openapi.json does not match the actual API. '
+              + 'Other services rely on this file to know which endpoints exist, '
+              + 'so they may break if it is out of date.\n'
+              + 'Run `uv run poe export-openapi` and commit the result.',
+              { file: 'backend/openapi.json' }
+            )
