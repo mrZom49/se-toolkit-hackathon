@@ -18,6 +18,9 @@
     handle /items* {
         reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
     }
+    handle /flashcards* {
+        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+    }
     handle /learners* {
         reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
     }

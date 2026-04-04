@@ -24,7 +24,6 @@ function App() {
     () => localStorage.getItem(STORAGE_KEY) ?? '',
   )
   const [draft, setDraft] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'viewer' | 'editor'>('viewer')
   const [page, setPage] = useState<Page>('dashboard')
   const [role, setRole] = useState<'viewer' | 'editor'>(() => {
     const savedRole = localStorage.getItem('user_role')
@@ -32,13 +31,15 @@ function App() {
   })
 
   function handleConnect(e: FormEvent) {
+
+  function handleConnect(e: FormEvent, userRole: 'viewer' | 'editor') {
     e.preventDefault()
     const trimmed = draft.trim()
     if (!trimmed) return
     localStorage.setItem(STORAGE_KEY, trimmed)
-    localStorage.setItem('user_role', selectedRole)
+    localStorage.setItem('user_role', userRole)
     setToken(trimmed)
-    setRole(selectedRole)
+    setRole(userRole)
   }
 
   function handleDisconnect() {
@@ -51,7 +52,7 @@ function App() {
 
   if (!token) {
     return (
-      <form className="token-form" onSubmit={handleConnect}>
+      <form className="token-form" onSubmit={(e) => handleConnect(e, 'viewer')}>
         <h1>LMS API Key</h1>
         <p>Enter your LMS API key to connect.</p>
         <input
@@ -66,8 +67,7 @@ function App() {
               type="radio"
               name="role"
               value="viewer"
-              checked={selectedRole === 'viewer'}
-              onChange={() => setSelectedRole('viewer')}
+              defaultChecked
             />
             Viewer
           </label>
@@ -76,8 +76,6 @@ function App() {
               type="radio"
               name="role"
               value="editor"
-              checked={selectedRole === 'editor'}
-              onChange={() => setSelectedRole('editor')}
             />
             Editor
           </label>

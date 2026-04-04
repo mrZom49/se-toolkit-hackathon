@@ -35,3 +35,19 @@ CREATE TABLE IF NOT EXISTS interacts (
     checks_total INTEGER,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Flashcards: Deck of flashcards
+CREATE TABLE IF NOT EXISTS deck (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Flashcards: Individual cards within a deck
+CREATE TABLE IF NOT EXISTS card (
+    id SERIAL PRIMARY KEY,
+    deck_id INTEGER NOT NULL REFERENCES deck(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

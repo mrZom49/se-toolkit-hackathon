@@ -12,7 +12,14 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from lms_backend.auth import verify_api_key
-from lms_backend.routers import analytics, interactions, items, learners, pipeline
+from lms_backend.routers import (
+    analytics,
+    flashcards,
+    interactions,
+    items,
+    learners,
+    pipeline,
+)
 from lms_backend.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -97,6 +104,12 @@ app.include_router(
     prefix="/items",
     tags=["items"],
     dependencies=[Depends(verify_api_key)],
+)
+
+app.include_router(
+    flashcards.router,
+    prefix="/flashcards",
+    tags=["flashcards"],
 )
 
 if settings.enable_interactions:
