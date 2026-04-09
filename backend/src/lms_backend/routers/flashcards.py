@@ -37,7 +37,24 @@ logger = logging.getLogger(__name__)
 
 @router.get("/decks", response_model=list[DeckRead])
 async def get_decks(user: UserDep, session: AsyncSession = Depends(get_session)):
-    """Get all decks for the current user."""
+    """Get all decks (visible to everyone)."""
+    try:
+        result = await session.exec(select(Deck))
+        return list(result.all())
+    except Exception as exc:
+        logger.warning(
+            "decks_list_failed",
+            extra={"event": "decks_list_failed", "error": str(exc)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backend error: {exc}",
+        ) from exc
+
+
+@router.get("/decks/my", response_model=list[DeckRead])
+async def get_my_decks(user: UserDep, session: AsyncSession = Depends(get_session)):
+    """Get only the current user's own decks."""
     user_id = user.id
     if user_id is None:
         raise HTTPException(
@@ -49,8 +66,8 @@ async def get_decks(user: UserDep, session: AsyncSession = Depends(get_session))
         return list(result.all())
     except Exception as exc:
         logger.warning(
-            "decks_list_failed",
-            extra={"event": "decks_list_failed", "error": str(exc)},
+            "my_decks_list_failed",
+            extra={"event": "my_decks_list_failed", "error": str(exc)},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -83,7 +100,7 @@ async def get_cards(
 ):
     """Get all cards for a deck."""
     deck = await read_deck(session, deck_id)
-    if deck is None or deck.user_id != user.id:
+    if deck is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Deck not found"
         )

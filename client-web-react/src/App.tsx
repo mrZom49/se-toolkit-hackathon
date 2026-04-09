@@ -130,6 +130,17 @@ function AuthPage({ onLogin }: { onLogin: (token: string) => void }) {
 
 function DashboardPage({ token }: { token: string }) {
   const [decks, setDecks] = useState<Deck[]>([])
+  const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null)
+  const [cards, setCards] = useState<Card[]>([])
+  const [studyCards, setStudyCards] = useState<Card[]>([])
+  const [studyIndex, setStudyIndex] = useState(0)
+  const [isFlipped, setIsFlipped] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+  const [showStudy, setShowStudy] = useState(false)
+  const [studyComplete, setStudyComplete] = useState(false)
+  const [knownCount, setKnownCount] = useState(0)
+  const [dontKnowCount, setDontKnowCount] = useState(0)
+  const [shuffle, setShuffle] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -154,9 +165,170 @@ function DashboardPage({ token }: { token: string }) {
     }
   }
 
+  const loadCards = async (deckId: number) => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/flashcards/decks/${deckId}/cards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `HTTP ${res.status}`)
+      }
+      const data: Card[] = await res.json()
+      setCards(data)
+    } catch (err) {
+      console.error('Load cards error:', err)
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadDecks()
   }, [])
+
+  const startStudy = () => {
+    if (cards.length === 0) return
+    let deckCards = [...cards]
+    if (shuffle) {
+      for (let i = deckCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]]
+      }
+    }
+    setStudyCards(deckCards)
+    setStudyIndex(0)
+    setIsFlipped(false)
+    setStudyComplete(false)
+    setKnownCount(0)
+    setDontKnowCount(0)
+    setShowStudy(true)
+  }
+
+  const gradeCard = (known: boolean) => {
+    if (known) {
+      setKnownCount((c) => c + 1)
+    } else {
+      setDontKnowCount((c) => c + 1)
+    }
+    setIsResetting(true)
+    setIsFlipped(false)
+    setTimeout(() => {
+      if (studyIndex < studyCards.length - 1) {
+        setStudyIndex(studyIndex + 1)
+      } else {
+        setStudyComplete(true)
+      }
+      setIsResetting(false)
+    }, 300)
+  }
+
+  if (studyComplete) {
+    const total = knownCount + dontKnowCount
+    const pct = total > 0 ? Math.round((knownCount / total) * 100) : 0
+    return (
+      <div className="flashcards-container">
+        <div className="study-mode">
+          <h2>Session Complete!</h2>
+          <div className="summary-card">
+            <p className="summary-score">{pct}%</p>
+            <p className="summary-label">Cards You Know</p>
+            <div className="summary-stats">
+              <span className="stat-know">✅ Know: {knownCount}</span>
+              <span className="stat-dontknow">❌ Don't Know: {dontKnowCount}</span>
+              <span className="stat-total">Total: {total}</span>
+            </div>
+          </div>
+          <button className="btn-back" onClick={() => { setShowStudy(false); setStudyComplete(false); }}>
+            Back to Deck
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (showStudy && studyCards.length > 0) {
+    const currentCard = studyCards[studyIndex]
+    return (
+      <div className="flashcards-container">
+        <div className="study-mode">
+          <h2>Study Mode ({studyIndex + 1}/{studyCards.length})</h2>
+          <div
+            className={`flashcard ${isFlipped ? 'flipped' : ''} ${isResetting ? 'resetting' : ''}`}
+            onClick={() => setIsFlipped(!isFlipped)}
+          >
+            <div className="flashcard-inner">
+              <div className="flashcard-front">
+                <p>{currentCard.question}</p>
+                <span className="flip-hint">Click to flip</span>
+              </div>
+              <div className="flashcard-back">
+                <p>{currentCard.answer}</p>
+              </div>
+            </div>
+          </div>
+          {isFlipped && (
+            <div className="grade-buttons">
+              <button className="btn-know" onClick={() => gradeCard(true)}>
+                Know
+              </button>
+              <button className="btn-dont-know" onClick={() => gradeCard(false)}>
+                Don't Know
+              </button>
+            </div>
+          )}
+          <button className="btn-back" onClick={() => setShowStudy(false)}>
+            Exit Study
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (selectedDeck) {
+    return (
+      <div className="flashcards-container">
+        <div className="cards-section">
+          <button className="btn-back" onClick={() => { setSelectedDeck(null); setCards([]); }}>
+            Back to Decks
+          </button>
+          <h2>{selectedDeck.name}</h2>
+          <div className="study-options">
+            <label className="shuffle-toggle">
+              <input
+                type="checkbox"
+                checked={shuffle}
+                onChange={(e) => setShuffle(e.target.checked)}
+              />
+              Shuffle
+            </label>
+          </div>
+          <button
+            className="btn-study"
+            onClick={startStudy}
+            disabled={cards.length === 0}
+          >
+            Study ({cards.length} cards)
+          </button>
+          <div className="card-list">
+            {cards.map((card) => (
+              <div key={card.id} className="card-item">
+                <div className="card-question">
+                  <strong>Q:</strong> {card.question}
+                </div>
+                <div className="card-answer">
+                  <strong>A:</strong> {card.answer}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="dashboard-container">
@@ -165,7 +337,14 @@ function DashboardPage({ token }: { token: string }) {
       {loading && <p>Loading...</p>}
       <div className="deck-list">
         {decks.map((deck) => (
-          <div key={deck.id} className="deck-card">
+          <div
+            key={deck.id}
+            className="deck-card"
+            onClick={() => {
+              setSelectedDeck(deck)
+              loadCards(deck.id)
+            }}
+          >
             <h3>{deck.name}</h3>
             <p>Created: {new Date(deck.created_at).toLocaleDateString()}</p>
           </div>
@@ -184,6 +363,10 @@ function FlashcardsPage({ token }: { token: string }) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [showStudy, setShowStudy] = useState(false)
+  const [studyComplete, setStudyComplete] = useState(false)
+  const [knownCount, setKnownCount] = useState(0)
+  const [dontKnowCount, setDontKnowCount] = useState(0)
+  const [shuffle, setShuffle] = useState(false)
   const [newDeckName, setNewDeckName] = useState('')
   const [newQuestion, setNewQuestion] = useState('')
   const [newAnswer, setNewAnswer] = useState('')
@@ -194,7 +377,7 @@ function FlashcardsPage({ token }: { token: string }) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/flashcards/decks', {
+      const res = await fetch('/flashcards/decks/my', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
@@ -329,23 +512,62 @@ function FlashcardsPage({ token }: { token: string }) {
 
   const startStudy = () => {
     if (cards.length === 0) return
-    setStudyCards([...cards])
+    let deckCards = [...cards]
+    if (shuffle) {
+      for (let i = deckCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]]
+      }
+    }
+    setStudyCards(deckCards)
     setStudyIndex(0)
     setIsFlipped(false)
+    setStudyComplete(false)
+    setKnownCount(0)
+    setDontKnowCount(0)
     setShowStudy(true)
   }
 
-  const gradeCard = () => {
+  const gradeCard = (known: boolean) => {
+    if (known) {
+      setKnownCount((c) => c + 1)
+    } else {
+      setDontKnowCount((c) => c + 1)
+    }
     setIsResetting(true)
     setIsFlipped(false)
     setTimeout(() => {
       if (studyIndex < studyCards.length - 1) {
         setStudyIndex(studyIndex + 1)
       } else {
-        setShowStudy(false)
+        setStudyComplete(true)
       }
       setIsResetting(false)
     }, 300)
+  }
+
+  if (studyComplete) {
+    const total = knownCount + dontKnowCount
+    const pct = total > 0 ? Math.round((knownCount / total) * 100) : 0
+    return (
+      <div className="flashcards-container">
+        <div className="study-mode">
+          <h2>Session Complete!</h2>
+          <div className="summary-card">
+            <p className="summary-score">{pct}%</p>
+            <p className="summary-label">Cards You Know</p>
+            <div className="summary-stats">
+              <span className="stat-know">✅ Know: {knownCount}</span>
+              <span className="stat-dontknow">❌ Don't Know: {dontKnowCount}</span>
+              <span className="stat-total">Total: {total}</span>
+            </div>
+          </div>
+          <button className="btn-back" onClick={() => { setShowStudy(false); setStudyComplete(false); }}>
+            Back to Deck
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (showStudy && studyCards.length > 0) {
@@ -370,10 +592,10 @@ function FlashcardsPage({ token }: { token: string }) {
           </div>
           {isFlipped && (
             <div className="grade-buttons">
-              <button className="btn-know" onClick={gradeCard}>
+              <button className="btn-know" onClick={() => gradeCard(true)}>
                 Know
               </button>
-              <button className="btn-dont-know" onClick={gradeCard}>
+              <button className="btn-dont-know" onClick={() => gradeCard(false)}>
                 Don't Know
               </button>
             </div>
@@ -466,6 +688,16 @@ function FlashcardsPage({ token }: { token: string }) {
             />
             <button type="submit">Add Card</button>
           </form>
+          <div className="study-options">
+            <label className="shuffle-toggle">
+              <input
+                type="checkbox"
+                checked={shuffle}
+                onChange={(e) => setShuffle(e.target.checked)}
+              />
+              Shuffle
+            </label>
+          </div>
           <button
             className="btn-study"
             onClick={startStudy}

@@ -21,7 +21,7 @@
 
   // Change the Primary Sidebar location
 
-  "workbench.sideBar.location": "right",
+  "workbench.sideBar.location": "left",
 
   // Markdown settings
 

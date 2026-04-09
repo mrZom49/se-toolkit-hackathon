@@ -357,3 +357,65 @@ tr:nth-child(even) {
   cursor: pointer;
   font-size: 1rem;
 }
+
+/* Summary Card */
+
+.summary-card {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem auto;
+  max-width: 400px;
+}
+
+.summary-score {
+  font-size: 3rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.summary-label {
+  font-size: 1.1rem;
+  margin: 0.25rem 0 1.5rem 0;
+  opacity: 0.9;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.summary-stats span {
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+/* Shuffle Toggle */
+
+.study-options {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.shuffle-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.shuffle-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
